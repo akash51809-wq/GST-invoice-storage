@@ -14,6 +14,14 @@ for (const key of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_
   if (process.env[key]) process.env[key] = process.env[key].trim();
 }
 
+const DEFAULT_GOOGLE_CLIENT_ID = '470355717619-v0vof30kb84cljoec6eo99a5eo7s3ft3.apps.googleusercontent.com';
+const DEFAULT_GOOGLE_REDIRECT_URI = 'https://urban-zebra-96j7xv69wvqx6w-4322.app.github.dev/auth/google/callback';
+
+// The Client ID is not a secret. Use the configured value when present, but keep
+// the known working client as a safe default for this Codespaces development app.
+if (!process.env.GOOGLE_CLIENT_ID) process.env.GOOGLE_CLIENT_ID = DEFAULT_GOOGLE_CLIENT_ID;
+if (!process.env.GOOGLE_REDIRECT_URI) process.env.GOOGLE_REDIRECT_URI = DEFAULT_GOOGLE_REDIRECT_URI;
+
 console.log('--- Google Drive Config Status ---');
 console.log('Client ID Loaded:', process.env.GOOGLE_CLIENT_ID ? 'YES (' + process.env.GOOGLE_CLIENT_ID.substring(0, 10) + '...)' : 'NO / MISSING');
 console.log('Client Secret Loaded:', process.env.GOOGLE_CLIENT_SECRET ? 'YES' : 'NO / MISSING');
@@ -65,13 +73,13 @@ async function saveEnvironmentValues(values) {
 
 app.post('/api/save-drive-config', async (request, response) => {
   const values = {
-    GOOGLE_CLIENT_ID: cleanConfigValue(request.body.clientId),
+    GOOGLE_CLIENT_ID: cleanConfigValue(request.body.clientId) || DEFAULT_GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: cleanConfigValue(request.body.clientSecret),
-    GOOGLE_REDIRECT_URI: cleanConfigValue(request.body.redirectUri),
+    GOOGLE_REDIRECT_URI: cleanConfigValue(request.body.redirectUri) || DEFAULT_GOOGLE_REDIRECT_URI,
   };
 
-  if (Object.values(values).some((value) => !value) || !/^https?:\/\//i.test(values.GOOGLE_REDIRECT_URI)) {
-    return response.status(400).json({ success: false, error: 'Client ID, client secret, and a valid redirect URI are required.' });
+  if (!values.GOOGLE_CLIENT_SECRET || !/^https?:\/\//i.test(values.GOOGLE_REDIRECT_URI)) {
+    return response.status(400).json({ success: false, error: 'Client secret and a valid redirect URI are required.' });
   }
 
   try {
@@ -86,16 +94,14 @@ app.post('/api/save-drive-config', async (request, response) => {
 });
 
 function getConfiguredRedirectUri() {
-  const redirectUri = cleanConfigValue(process.env.GOOGLE_REDIRECT_URI);
-  if (!redirectUri) {
-    throw new Error('Google Redirect URI is not configured. Open Settings and save the exact callback URL first.');
-  }
+  const redirectUri = cleanConfigValue(process.env.GOOGLE_REDIRECT_URI) || DEFAULT_GOOGLE_REDIRECT_URI;
   return redirectUri;
 }
 
 function beginGoogleAuthorization(request, response) {
   try {
     const redirectUri = getConfiguredRedirectUri();
+    console.log('Starting Google OAuth with client ID:', process.env.GOOGLE_CLIENT_ID);
     console.log('Starting Google OAuth with redirect URI:', redirectUri);
     return response.redirect(getAuthorizationUrl(redirectUri));
   } catch (error) {
@@ -115,7 +121,6 @@ async function completeGoogleAuthorization(request, response) {
     }
 
     // Use exactly the same redirect URI that was used to create the OAuth URL.
-    // Google rejects the token exchange if even one character is different.
     const redirectUri = getConfiguredRedirectUri();
     const tokens = await exchangeAuthorizationCode(request.query.code, redirectUri);
     const tokenValues = {};
@@ -147,7 +152,8 @@ app.get('/api/drive/status', async (request, response) => {
     success: true,
     configured: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REDIRECT_URI),
     authorized: Boolean(process.env.GOOGLE_REFRESH_TOKEN),
-    redirectUri: process.env.GOOGLE_REDIRECT_URI || null,
+    clientId: process.env.GOOGLE_CLIENT_ID || null,
+    redirectUri: process.env.GOOGLE_REDIRECT_URI || DEFAULT_GOOGLE_REDIRECT_URI,
   });
 });
 
