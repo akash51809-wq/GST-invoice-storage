@@ -19,6 +19,18 @@ const uploadButton = document.querySelector('#uploadButton');
 const uploadMessage = document.querySelector('#uploadMessage');
 const uploadProgress = document.querySelector('#uploadProgress');
 
+const GOOGLE_CLIENT_ID_DEFAULT = '470355717619-v0vof30kb84cljoec6eo99a5eo7s3ft3.apps.googleusercontent.com';
+const GOOGLE_REDIRECT_URI_DEFAULT = 'https://urban-zebra-96j7xv69wvqx6w-4322.app.github.dev/auth/google/callback';
+
+function initializeDriveConfigDefaults() {
+  const clientIdField = driveConfigForm?.querySelector('[name="clientId"]');
+  const redirectUriField = driveConfigForm?.querySelector('[name="redirectUri"]');
+  if (clientIdField && !clientIdField.value) clientIdField.value = GOOGLE_CLIENT_ID_DEFAULT;
+  if (redirectUriField && !redirectUriField.value) redirectUriField.value = GOOGLE_REDIRECT_URI_DEFAULT;
+}
+
+initializeDriveConfigDefaults();
+
 loginForm.addEventListener('submit', (event) => {
   event.preventDefault();
   const formData = new FormData(loginForm);
@@ -54,6 +66,7 @@ document.querySelectorAll('.main-nav a').forEach((link) => {
       ? `<span>Manage</span><b>/</b> ${isUpload ? 'Upload Invoice' : 'Settings'}`
       : '<span>Workspace</span><b>/</b> My Dashboard';
     sidebar.classList.remove('is-open');
+    if (isSettings) initializeDriveConfigDefaults();
   });
 });
 
@@ -136,6 +149,7 @@ driveConfigForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   driveConfigMessage.className = 'settings-message';
   driveConfigMessage.textContent = 'Saving securely...';
+  initializeDriveConfigDefaults();
   const formData = new FormData(driveConfigForm);
 
   try {
@@ -148,7 +162,6 @@ driveConfigForm.addEventListener('submit', async (event) => {
     if (!response.ok) throw new Error(result.error || result.message || 'Unable to save configuration.');
     driveConfigMessage.className = 'settings-message success';
     driveConfigMessage.textContent = result.message;
-    driveConfigForm.reset();
   } catch (error) {
     driveConfigMessage.className = 'settings-message error';
     driveConfigMessage.textContent = error.message.includes('Failed to fetch')
