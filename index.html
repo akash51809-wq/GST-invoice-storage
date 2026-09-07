@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0f19" />
+    <title>GST Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main id="loginView" class="login-view">
+      <div class="login-grid" aria-hidden="true"></div>
+      <div class="login-glow login-glow--one" aria-hidden="true"></div>
+      <div class="login-glow login-glow--two" aria-hidden="true"></div>
+      <section class="login-card tech-frame" aria-labelledby="loginTitle">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <p class="eyebrow">GST / SECURE ACCESS</p>
+        <h1 id="loginTitle">Welcome back<span class="cyan">.</span></h1>
+        <p class="login-intro">Sign in to access your invoice intelligence workspace.</p>
+        <form id="loginForm" novalidate>
+          <label class="field-label" for="username">Username</label>
+          <div class="input-wrap"><span class="input-icon">◈</span><input id="username" name="username" autocomplete="username" placeholder="Enter username" required /></div>
+          <label class="field-label" for="password">Password</label>
+          <div class="input-wrap"><span class="input-icon">▣</span><input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter password" required /></div>
+          <p id="loginError" class="login-error" role="alert"></p>
+          <button class="primary-button" type="submit">Enter command center <span>↗</span></button>
+        </form>
+        <div class="login-footer"><span class="status-dot"></span> SYSTEMS OPERATIONAL <span>v2.4.08</span></div>
+      </section>
+    </main>
+
+    <main id="dashboardView" class="dashboard-view is-hidden">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand"><div class="brand-mark small" aria-hidden="true"><span></span><span></span><span></span></div><span>GST<span class="cyan">/</span>OPS</span></div>
+        <p class="nav-label">Workspace</p>
+        <nav class="main-nav" aria-label="Main navigation">
+          <a href="#profile"><span class="nav-icon">◉</span> My Profile <span class="nav-arrow">›</span></a>
+          <a class="active" href="#dashboard"><span class="nav-icon">▦</span> My Dashboard <span class="nav-arrow">›</span></a>
+          <a href="#country"><span class="nav-icon">◎</span> Country Dashboard <span class="nav-arrow">›</span></a>
+          <a href="#group"><span class="nav-icon">⌘</span> Group Dashboard <span class="nav-arrow">›</span></a>
+          <a href="#analytics"><span class="nav-icon">⌁</span> Analytics <span class="nav-arrow">›</span></a>
+        </nav>
+        <p class="nav-label nav-label--lower">Manage</p>
+        <nav class="main-nav" aria-label="Management navigation">
+          <a href="#invoices"><span class="nav-icon">▤</span> Invoices <span class="nav-count">24</span></a>
+          <a id="uploadLink" href="#upload"><span class="nav-icon">↥</span> Upload Invoice <span class="nav-arrow">›</span></a>
+          <a id="settingsLink" href="#settings"><span class="nav-icon">⚙</span> Settings <span class="nav-arrow">›</span></a>
+        </nav>
+        <div class="sidebar-bottom"><div class="support-icon">?</div><div><strong>Need assistance?</strong><small>Contact command support</small></div><span>›</span></div>
+      </aside>
+      <section class="dashboard-main">
+        <header class="topbar">
+          <button id="menuButton" class="icon-button menu-button" aria-label="Open navigation">☰</button>
+          <div class="breadcrumb"><span>Workspace</span><b>/</b> My Dashboard</div>
+          <div class="topbar-actions"><button class="icon-button" aria-label="Search">⌕</button><button class="icon-button notification" aria-label="Notifications">♧<i></i></button><div class="profile-chip"><div class="avatar">AU</div><div class="profile-copy"><strong>Admin User</strong><small>Administrator</small></div><span class="chevron">⌄</span></div></div>
+        </header>
+        <div id="dashboardPage" class="dashboard-content">
+          <div class="welcome-row"><div><p class="eyebrow">MONDAY, 14 OCTOBER 2024</p><h2>Good morning, Admin<span class="cyan">.</span></h2><p class="muted">Here is your command center overview for today.</p></div><button class="outline-button">⌁ <span>Last 30 days</span>⌄</button></div>
+          <div class="metrics-grid">
+            <article class="metric-card accent-cyan tech-frame"><div class="metric-heading"><span>Total invoices</span><span class="mini-icon">↗</span></div><strong>12,468</strong><div class="metric-foot positive">+12.8% <span>vs last month</span></div><div class="sparkline sparkline-cyan" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+            <article class="metric-card accent-blue tech-frame"><div class="metric-heading"><span>GST collected</span><span class="mini-icon">₹</span></div><strong>₹ 8.42M</strong><div class="metric-foot positive">+8.4% <span>vs last month</span></div><div class="sparkline sparkline-blue" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+            <article class="metric-card accent-violet tech-frame"><div class="metric-heading"><span>Pending review</span><span class="mini-icon">◷</span></div><strong>384</strong><div class="metric-foot warning">-4.2% <span>vs last month</span></div><div class="sparkline sparkline-violet" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+            <article class="metric-card accent-amber tech-frame"><div class="metric-heading"><span>Compliance score</span><span class="mini-icon">◇</span></div><strong>94.6<span class="unit">%</span></strong><div class="metric-foot positive">+2.1% <span>vs last month</span></div><div class="score-ring"><span>94%</span></div></article>
+          </div>
+          <div class="widget-grid">
+            <article class="widget chart-widget tech-frame widget-wide"><div class="widget-head"><div><p class="eyebrow">PERFORMANCE</p><h3>Invoice activity</h3></div><div class="legend"><span><i class="dot cyan-dot"></i>Processed</span><span><i class="dot blue-dot"></i>Received</span></div></div><div class="chart-area"><div class="y-axis"><span>1,200</span><span>900</span><span>600</span><span>300</span><span>0</span></div><div class="line-chart"><div class="chart-lines"></div><svg viewBox="0 0 600 190" preserveAspectRatio="none" role="img" aria-label="Invoice activity line chart"><defs><linearGradient id="areaFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#21e6ee" stop-opacity=".2"/><stop offset="1" stop-color="#21e6ee" stop-opacity="0"/></linearGradient></defs><path class="area" d="M0 144 C35 135 50 150 77 125 S120 90 143 112 S183 90 207 95 S250 130 273 104 S313 66 337 88 S380 76 405 58 S445 91 466 72 S510 44 535 62 S570 30 600 15 L600 190 L0 190Z"/><path class="chart-line received" d="M0 158 C35 150 50 162 77 144 S120 126 143 136 S183 108 207 120 S250 151 273 131 S313 106 337 114 S380 112 405 91 S445 115 466 101 S510 92 535 99 S570 75 600 59"/><path class="chart-line processed" d="M0 144 C35 135 50 150 77 125 S120 90 143 112 S183 90 207 95 S250 130 273 104 S313 66 337 88 S380 76 405 58 S445 91 466 72 S510 44 535 62 S570 30 600 15"/></svg><div class="x-axis"><span>01 Oct</span><span>07 Oct</span><span>14 Oct</span><span>21 Oct</span><span>28 Oct</span></div></div></div></article>
+            <article class="widget apps-widget tech-frame"><div class="widget-head"><div><p class="eyebrow">OVERVIEW</p><h3>Top apps</h3></div><button class="more-button" aria-label="More options">•••</button></div><div class="app-list"><div><span class="app-symbol violet-bg">▤</span><div><strong>Invoice Hub</strong><small>4,286 active users</small></div><b>42%</b></div><div><span class="app-symbol cyan-bg">⌁</span><div><strong>GST Reports</strong><small>2,842 active users</small></div><b>28%</b></div><div><span class="app-symbol amber-bg">◌</span><div><strong>Tax Calculator</strong><small>1,924 active users</small></div><b>19%</b></div><div><span class="app-symbol blue-bg">◇</span><div><strong>Compliance</strong><small>982 active users</small></div><b>11%</b></div></div></article>
+            <article class="widget map-widget tech-frame"><div class="widget-head"><div><p class="eyebrow">DISTRIBUTION</p><h3>Country dashboard</h3></div><button class="more-button" aria-label="More options">•••</button></div><div class="map-placeholder"><div class="map-shape">◈<span>INDIA</span></div><div class="map-stat"><strong>28</strong><small>active regions</small><em>+16.4%</em></div></div></article>
+            <article class="widget target-widget tech-frame"><div class="widget-head"><div><p class="eyebrow">TARGET UPDATES</p><h3>Monthly targets</h3></div><button class="more-button" aria-label="More options">•••</button></div><div class="target-row"><div class="target-ring"><span>78<small>%</small></span></div><div><strong>₹ 10.8M</strong><small>of ₹ 14.2M target</small><div class="progress"><i></i></div></div></div><div class="target-footer"><span>On track</span><b>22 days left</b></div></article>
+            <article class="widget donut-widget tech-frame"><div class="widget-head"><div><p class="eyebrow">BREAKDOWN</p><h3>CP dataput</h3></div><button class="more-button" aria-label="More options">•••</button></div><div class="donut-content"><div class="donut-chart"><span>1,248<small>total</small></span></div><div class="donut-legend"><span><i class="dot cyan-dot"></i>Approved <b>52%</b></span><span><i class="dot violet-dot"></i>In review <b>28%</b></span><span><i class="dot amber-dot"></i>Rejected <b>20%</b></span></div></div></article>
+          </div>
+        </div>
+        <div id="settingsPage" class="dashboard-content settings-page is-hidden">
+          <div class="settings-heading"><div><p class="eyebrow">INTEGRATIONS / SETTINGS</p><h2>Connect Google Drive<span class="cyan">.</span></h2><p class="muted">Securely configure the Google Drive connection used by your invoice workspace.</p></div><span class="connection-status"><i></i> BACKEND READY</span></div>
+          <div class="settings-layout">
+            <form id="driveConfigForm" class="settings-card tech-frame" autocomplete="off">
+              <div class="widget-head"><div><p class="eyebrow">GOOGLE CLOUD</p><h3>OAuth configuration</h3></div><span class="lock-mark">▣</span></div>
+              <p class="settings-copy">These credentials are sent directly to the backend and stored in the project environment. They are never echoed back to this page.</p>
+              <label class="field-label" for="googleClientId">Google Client ID</label>
+              <input class="settings-input" id="googleClientId" name="clientId" type="text" placeholder="1234567890.apps.googleusercontent.com" required />
+              <label class="field-label" for="googleClientSecret">Google Client Secret</label>
+              <input class="settings-input" id="googleClientSecret" name="clientSecret" type="password" placeholder="Enter client secret" required />
+              <label class="field-label" for="googleRedirectUri">Redirect URI</label>
+              <input class="settings-input" id="googleRedirectUri" name="redirectUri" type="url" placeholder="http://localhost:4322/auth/google/callback" required />
+              <p id="driveConfigMessage" class="settings-message" role="status"></p>
+              <button class="primary-button settings-submit" type="submit">Save configuration <span>↗</span></button>
+            </form>
+            <aside class="settings-card settings-info tech-frame"><p class="eyebrow">CONNECTION FLOW</p><h3>Drive access</h3><div class="flow-step"><b>01</b><div><strong>Save credentials</strong><small>Stored as server-side environment variables.</small></div></div><div class="flow-step"><b>02</b><div><strong>Authorize workspace</strong><small>Grant read access through Google's OAuth consent screen.</small></div></div><div class="flow-step"><b>03</b><div><strong>Read invoice files</strong><small>Excel files can be listed and read through the Drive API.</small></div></div><a class="primary-button settings-auth-button" href="/auth/google">Login / Authorize with Google <span>↗</span></a></aside>
+          </div>
+        </div>
+        <div id="uploadPage" class="dashboard-content upload-page is-hidden">
+          <div class="settings-heading"><div><p class="eyebrow">INVOICES / GOOGLE DRIVE</p><h2>Upload Invoice<span class="cyan">.</span></h2><p class="muted">Send a new invoice directly to your connected Google Drive workspace.</p></div><span class="connection-status"><i></i> ENCRYPTED TRANSFER</span></div>
+          <form id="invoiceUploadForm" class="upload-card tech-frame">
+            <input id="invoiceFile" name="invoice" type="file" accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,image/*,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden required />
+            <div id="dropZone" class="drop-zone" tabindex="0" role="button" aria-controls="invoiceFile">
+              <div class="upload-icon">↥</div><h3>Drop invoice file here</h3><p>or select a file from your device</p><button id="browseButton" class="outline-button" type="button">Browse files</button><small>Excel, CSV, PDF, PNG, JPG up to 10 MB</small>
+            </div>
+            <div id="selectedFile" class="selected-file is-hidden"><span class="file-icon">▤</span><div><strong></strong><small></small></div><button id="removeFile" type="button" aria-label="Remove selected file">×</button></div>
+            <div id="uploadProgress" class="upload-progress is-hidden"><div class="progress-label"><span>Uploading to Google Drive</span><b>0%</b></div><div class="progress-track"><i></i></div></div>
+            <p id="uploadMessage" class="settings-message" role="status"></p>
+            <button id="uploadButton" class="primary-button upload-submit" type="submit" disabled>Upload to Google Drive <span>↗</span></button>
+          </form>
+        </div>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
