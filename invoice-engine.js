@@ -32,18 +32,14 @@ function extractPdfText(buffer) {
     const text = extractPdfOperators(data.toString('latin1'));
     if (text) pages.push(text);
   }
-  if (!pages.length) return [{ page: 1, text: '' }];
-  return pages.map((text, index) => ({ page: index + 1, text: clean(text) }));
+  return pages.length ? pages.map((text, i) => ({ page: i + 1, text: clean(text) })) : [{ page: 1, text: '' }];
 }
 
 function extractPdfOperators(content) {
   const out = [];
-  const literal = /\((?:\\.|[^\\)])*\)\s*Tj/g;
   let match;
-  while ((match = literal.exec(content))) {
-    const token = match[0].replace(/\)\s*Tj$/, '').replace(/^\(/, '');
-    out.push(decodePdfLiteral(token));
-  }
+  const literal = /\((?:\\.|[^\\)])*\)\s*Tj/g;
+  while ((match = literal.exec(content))) out.push(decodePdfLiteral(match[0].replace(/\)\s*Tj$/, '').replace(/^\(/, '')));
   const arrays = /\[(.*?)\]\s*TJ/gs;
   while ((match = arrays.exec(content))) {
     const parts = match[1].match(/\((?:\\.|[^\\)])*\)|<[^>]*>/g) || [];
@@ -51,15 +47,8 @@ function extractPdfOperators(content) {
   }
   return out.join(' ');
 }
-
-function decodePdfLiteral(value) {
-  return value.replace(/\\n/g, ' ').replace(/\\r/g, ' ').replace(/\\t/g, ' ').replace(/\\([\\()])/g, '$1').replace(/\\[0-7]{1,3}/g, ' ');
-}
-function decodePdfHex(value) {
-  const hex = value.slice(1, -1).replace(/[^0-9a-f]/gi, '');
-  const padded = hex.length % 2 ? `${hex}0` : hex;
-  try { return Buffer.from(padded, 'hex').toString('utf8'); } catch (_) { return ''; }
-}
+function decodePdfLiteral(value) { return value.replace(/\\n/g, ' ').replace(/\\r/g, ' ').replace(/\\t/g, ' ').replace(/\\([\\()])/g, '$1').replace(/\\[0-7]{1,3}/g, ' '); }
+function decodePdfHex(value) { const hex = value.slice(1, -1).replace(/[^0-9a-f]/gi, ''); try { return Buffer.from(hex.length % 2 ? `${hex}0` : hex, 'hex').toString('utf8'); } catch (_) { return ''; } }
 
 function extractTextPages(file) {
   const mime = String(file.mimetype || '').toLowerCase();
@@ -67,84 +56,117 @@ function extractTextPages(file) {
   return [{ page: 1, text: '' }];
 }
 
-function signatureFromText(text) {
-  const normalized = clean(text).toLowerCase()
-    .replace(/\b\d{1,4}[/-]\d{1,2}[/-]\d{2,4}\b/g, ' DATE ')
-    .replace(/\b\d+(?:\.\d+)?\b/g, ' NUM ')
-    .replace(/\s+/g, ' ').trim();
-  return normalized.split(' ').filter(Boolean).slice(0, 80).join(' ').slice(0, 900);
+const RULES = {
+  invoiceNumber: [/(?:invoice\s*(?:no|number|#)|inv\.?\s*(?:no|number|#)|tax\s*invoice)\s*[:#-]?\s*([A-Z0-9][A-Z0-9./_-]{2,})/i],
+  invoiceDate: [/(?:invoice\s*date|date\s*of\s*invoice)\s*[:#-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})/i],
+  sellerGSTIN: [/(?:seller\s*)?(?:gstin|gst\s*(?:no|number))\s*[:#-]?\s*([0-9A-Z]{15})/i],
+  buyerGSTIN: [/(?:buyer\s*)?(?:gstin|gst\s*(?:no|number))\s*[:#-]?\s*([0-9A-Z]{15})/i],
+  taxableAmount: [/(?:taxable\s*(?:value|amount)|taxable\s*value)\s*[:#-]?\s*[₹$]?\s*([0-9,]+(?:\.\d{1,2})?)/i],
+  cgst: [/(?:central\s*gst|cgst)\s*[:@#-]?\s*[₹$]?\s*([0-9,]+(?:\.\d{1,2})?)/i],
+  sgst: [/(?:state\s*gst|sgst)\s*[:@#-]?\s*[₹$]?\s*([0-9,]+(?:\.\d{1,2})?)/i],
+  igst: [/(?:integrated\s*gst|igst)\s*[:@#-]?\s*[₹$]?\s*([0-9,]+(?:\.\d{1,2})?)/i],
+  totalTax: [/(?:total\s*(?:tax|gst)|tax\s*total)\s*[:#-]?\s*[₹$]?\s*([0-9,]+(?:\.\d{1,2})?)/i],
+  grandTotal: [/(?:grand\s*total|invoice\s*total|total\s*(?:amount|payable)|net\s*amount)\s*[:#-]?\s*[₹$]?\s*([0-9,]+(?:\.\d{1,2})?)/i],
+  placeOfSupply: [/(?:place\s*of\s*supply|pos)\s*[:#-]?\s*([^\n|]{2,80})/i],
+  sellerName: [/(?:seller|sold\s*by|from)\s*[:#-]?\s*([^\n|]{2,100})/i],
+  buyerName: [/(?:buyer|billed\s*to|bill\s*to|customer)\s*[:#-]?\s*([^\n|]{2,100})/i],
+  sellerAddress: [/(?:seller\s*)?address\s*[:#-]?\s*([^\n|]{5,180})/i],
+  buyerAddress: [/(?:buyer\s*)?address\s*[:#-]?\s*([^\n|]{5,180})/i],
+};
+
+const LABELS = {
+  invoiceNumber: 'Invoice No', invoiceDate: 'Invoice Date', sellerName: 'Seller', sellerGSTIN: 'Seller GSTIN', sellerAddress: 'Seller Address',
+  buyerName: 'Buyer', buyerGSTIN: 'Buyer GSTIN', buyerAddress: 'Buyer Address', placeOfSupply: 'Place of Supply', taxableAmount: 'Taxable Amount',
+  cgst: 'CGST', sgst: 'SGST', igst: 'IGST', totalTax: 'Total Tax', grandTotal: 'Grand Total'
+};
+
+function firstMatch(text, patterns) {
+  for (const pattern of patterns || []) { const match = text.match(pattern); if (match?.[1]) return clean(match[1]); }
+  return '';
 }
 
-function findInvoiceNumbers(pages, sourceText) {
-  const all = pages.map((page) => page.text).join('\n');
-  const candidates = [];
-  const patterns = [
-    /(?:invoice\s*(?:no|number|#)|inv\.?\s*(?:no|number|#))\s*[:\-]?\s*([A-Z0-9][A-Z0-9./_-]{2,})/ig,
-    /(?:tax\s*invoice)\s*[:\-]?\s*([A-Z0-9][A-Z0-9./_-]{2,})/ig,
-  ];
-  for (const pattern of patterns) { let match; while ((match = pattern.exec(all))) candidates.push(clean(match[1])); }
-  if (candidates.length) return [...new Set(candidates)];
-  const fallback = clean(sourceText).match(/\b[A-Z]{1,6}[-/][A-Z0-9-]{3,}\b/i);
-  return fallback ? [fallback[0]] : [];
+function autoExtract(text, mapping = null) {
+  const values = {};
+  const sources = {};
+  for (const field of INVOICE_FIELDS) {
+    const saved = mapping?.fields?.[field.key];
+    const savedValue = saved?.sourceLabel ? locateValue(text, saved.sourceLabel) : '';
+    const patterns = RULES[field.key] || [];
+    values[field.key] = savedValue || firstMatch(text, patterns);
+    sources[field.key] = saved?.sourceLabel || (values[field.key] ? LABELS[field.key] : '');
+  }
+  // When seller/buyer are not explicitly labelled, use the first company-like lines around GSTINs.
+  if (!values.sellerName) {
+    const lines = text.split(/\n|\r/).map(clean).filter(Boolean);
+    values.sellerName = lines.find((x) => !/invoice|tax|gstin|gst|address|date|bill|buyer|customer|amount|total/i.test(x) && x.length > 2 && x.length < 100) || '';
+    if (values.sellerName) sources.sellerName = 'Auto detected company line';
+  }
+  return { values, sources };
 }
 
-function locateValue(text, rule) {
-  if (!rule) return '';
-  const label = clean(rule.label || rule.sourceLabel || '');
-  if (!label) return '';
-  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = new RegExp(`${escaped}\\s*[:#-]?\\s*([^\\n|]{1,180})`, 'i');
-  const match = text.match(pattern);
+function locateValue(text, label) {
+  const source = clean(label);
+  if (!source) return '';
+  const escaped = source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = text.match(new RegExp(`${escaped}\\s*[:#-]?\\s*([^\\n|]{1,180})`, 'i'));
   return match ? clean(match[1]) : '';
 }
 
-function autoExtract(text, mapping) {
-  const values = {};
-  for (const field of INVOICE_FIELDS) values[field.key] = locateValue(text, mapping?.fields?.[field.key]);
-  const fallbackPatterns = {
-    invoiceNumber: /(?:invoice\s*(?:no|number|#)|inv\.?\s*(?:no|number|#))\s*[:#-]?\s*([A-Z0-9./_-]{3,})/i,
-    invoiceDate: /(?:invoice\s*date|date)\s*[:#-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
-    sellerGSTIN: /(?:seller\s*)?(?:gstin|gst\s*no)\s*[:#-]?\s*([0-9A-Z]{15})/i,
-    buyerGSTIN: /(?:buyer\s*)?(?:gstin|gst\s*no)\s*[:#-]?\s*([0-9A-Z]{15})/i,
-    grandTotal: /(?:grand\s*total|invoice\s*total|total\s*amount|net\s*amount)\s*[:#-]?\s*[₹$]?\s*([0-9,]+(?:\.\d{1,2})?)/i,
-  };
-  for (const [key, pattern] of Object.entries(fallbackPatterns)) if (!values[key]) values[key] = clean(text.match(pattern)?.[1] || '');
-  return values;
+function findInvoiceNumbers(pages, sourceText) {
+  const numbers = [];
+  for (const page of pages) {
+    const value = firstMatch(page.text, RULES.invoiceNumber);
+    if (value) numbers.push(value);
+  }
+  if (numbers.length) return [...new Set(numbers)];
+  const fallback = clean(sourceText).match(/\b[A-Z]{1,8}[-/][A-Z0-9-]{3,}\b/i);
+  return fallback ? [fallback[0]] : [];
+}
+
+function formatFingerprint(text, values) {
+  const sellerGSTIN = normalize(values.sellerGSTIN);
+  const sellerName = normalize(values.sellerName);
+  const stableLabels = ['invoice','invoice no','invoice number','invoice date','gstin','taxable value','taxable amount','cgst','sgst','igst','grand total','total amount','place of supply','billed to','bill to'];
+  const found = stableLabels.filter((label) => normalize(text).includes(normalize(label))).map(normalize).sort().join('|');
+  if (sellerGSTIN) return `v2|gstin:${sellerGSTIN}|labels:${found}`;
+  if (sellerName) return `v2|seller:${sellerName}|labels:${found}`;
+  return `v2|labels:${found}`;
+}
+
+function signatureFromText(text) {
+  const probe = autoExtract(clean(text), null);
+  return formatFingerprint(text, probe.values);
 }
 
 function classifyInvoice(values) {
-  const buyer = normalize(values.buyerName);
-  const seller = normalize(values.sellerName);
-  const company = normalize('EASY RECHARGE SOLUTION');
+  const buyer = normalize(values.buyerName), seller = normalize(values.sellerName), company = normalize('EASY RECHARGE SOLUTION');
   if (buyer && buyer.includes(company)) return 'buy';
   if (seller && seller.includes(company)) return 'sell';
   return 'review';
 }
-
-function mergeValues(target, source) {
-  for (const field of INVOICE_FIELDS) if (!clean(target[field.key]) && clean(source[field.key])) target[field.key] = source[field.key];
-  return target;
-}
+function mergeValues(target, source) { for (const field of INVOICE_FIELDS) if (!clean(target[field.key]) && clean(source[field.key])) target[field.key] = source[field.key]; return target; }
 
 function processInvoice(file, mapping = null) {
   const pages = extractTextPages(file);
   const text = pages.map((page) => page.text).join('\n');
-  const signature = signatureFromText(text || file.originalname);
+  const probe = autoExtract(text, null);
+  const signature = formatFingerprint(text, probe.values);
   const invoiceNumbers = findInvoiceNumbers(pages, text);
-  if (!mapping) return { mode: 'mapping-required', signature, pages, invoiceNumbers, values: autoExtract(text, null), fields: INVOICE_FIELDS };
-
+  if (!mapping) {
+    return { mode: 'mapping-required', signature, pages, invoiceNumbers, values: probe.values, sources: probe.sources, fields: INVOICE_FIELDS, suggestedMapping: { signature, fields: Object.fromEntries(INVOICE_FIELDS.map((field) => ({ [field.key]: { label: LABELS[field.key], sourceLabel: probe.sources[field.key] || LABELS[field.key], page: 1 } }))) } };
+  }
   const groups = new Map();
   pages.forEach((page) => {
-    const values = autoExtract(page.text, mapping);
-    const number = values.invoiceNumber || invoiceNumbers[0] || `PAGE-${page.page}`;
-    const current = groups.get(number) || { ...values, pages: [] };
-    mergeValues(current, values);
+    const extracted = autoExtract(page.text, mapping);
+    const pageNumber = extracted.values.invoiceNumber || invoiceNumbers.find((n) => page.text.includes(n)) || invoiceNumbers[0] || `PAGE-${page.page}`;
+    const current = groups.get(pageNumber) || { ...extracted.values, pages: [] };
+    mergeValues(current, extracted.values);
     current.pages.push(page.page);
-    groups.set(number, current);
+    groups.set(pageNumber, current);
   });
-  if (!groups.size) groups.set(invoiceNumbers[0] || 'UNKNOWN', autoExtract(text, mapping));
+  if (!groups.size) groups.set(invoiceNumbers[0] || 'UNKNOWN', probe.values);
   const invoices = [...groups.entries()].map(([invoiceNumber, values]) => ({ ...values, invoiceNumber, classification: classifyInvoice(values), sourcePages: values.pages || pages.map((page) => page.page) }));
   return { mode: 'auto', signature, pages, invoices, fields: INVOICE_FIELDS };
 }
 
-module.exports = { INVOICE_FIELDS, clean, normalize, signatureFromText, processInvoice, autoExtract, classifyInvoice, mergeValues };
+module.exports = { INVOICE_FIELDS, clean, normalize, signatureFromText, processInvoice, autoExtract, classifyInvoice, mergeValues, formatFingerprint };
