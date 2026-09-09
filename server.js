@@ -4,159 +4,38 @@ const express = require('express');
 const multer = require('multer');
 const dotenv = require('dotenv');
 const { exchangeAuthorizationCode, getAuthorizationUrl, listExcelFiles, readExcelFile, uploadInvoice, readJsonFile, writeJsonFile } = require('./drive-service');
-const { INVOICE_FIELDS, processInvoice, classifyInvoice, signatureFromText, normalize } = require('./invoice-engine');
-
+const { INVOICE_FIELDS, processInvoice, classifyInvoice, normalize } = require('./invoice-engine');
 const rootDirectory = __dirname;
 const envPath = path.join(rootDirectory, '.env');
 dotenv.config({ path: envPath });
 for (const key of ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_REDIRECT_URI', 'GOOGLE_ACCESS_TOKEN', 'GOOGLE_REFRESH_TOKEN']) if (process.env[key]) process.env[key] = process.env[key].trim();
-
 const DEFAULT_GOOGLE_CLIENT_ID = '470355717619-v0vof30kb84cljoec6eo99a5eo7s3ft3.apps.googleusercontent.com';
 const DEFAULT_GOOGLE_REDIRECT_URI = 'https://urban-zebra-96j7xv69wvqx6w-4322.app.github.dev/auth/google/callback';
 if (!process.env.GOOGLE_CLIENT_ID) process.env.GOOGLE_CLIENT_ID = DEFAULT_GOOGLE_CLIENT_ID;
 if (!process.env.GOOGLE_REDIRECT_URI) process.env.GOOGLE_REDIRECT_URI = DEFAULT_GOOGLE_REDIRECT_URI;
-
 const app = express();
 const port = Number(process.env.PORT) || 4322;
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (request, file, callback) => {
-    const allowed = /\.(xlsx|xls|csv|pdf|png|jpe?g)$/i.test(file.originalname);
-    callback(allowed ? null : new Error('Only Excel, CSV, PDF, PNG, and JPG files are supported.'), allowed);
-  },
-});
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 }, fileFilter: (request, file, callback) => { const allowed = /\.(xlsx|xls|csv|pdf|png|jpe?g)$/i.test(file.originalname); callback(allowed ? null : new Error('Only Excel, CSV, PDF, PNG, and JPG files are supported.'), allowed); } });
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(rootDirectory));
-
 function cleanConfigValue(value) { return typeof value === 'string' ? value.trim() : ''; }
-async function saveEnvironmentValues(values) {
-  let contents = '';
-  try { contents = await fs.readFile(envPath, 'utf8'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
-  const lines = contents.split(/\r?\n/).filter((line) => line.length > 0);
-  for (const [key, value] of Object.entries(values)) {
-    const escapedValue = value.replace(/\\/g, '\\\\').replace(/\n/g, '');
-    const index = lines.findIndex((line) => line.startsWith(`${key}=`));
-    if (index >= 0) lines[index] = `${key}=${escapedValue}`; else lines.push(`${key}=${escapedValue}`);
-    process.env[key] = value;
-  }
-  await fs.writeFile(envPath, `${lines.join('\n')}\n`, { mode: 0o600 });
-}
-
-app.post('/api/save-drive-config', async (request, response) => {
-  const values = {
-    GOOGLE_CLIENT_ID: cleanConfigValue(request.body.clientId) || DEFAULT_GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET: cleanConfigValue(request.body.clientSecret),
-    GOOGLE_REDIRECT_URI: cleanConfigValue(request.body.redirectUri) || DEFAULT_GOOGLE_REDIRECT_URI,
-  };
-  if (!values.GOOGLE_CLIENT_SECRET || !/^https?:\/\//i.test(values.GOOGLE_REDIRECT_URI)) return response.status(400).json({ success: false, error: 'Client secret and a valid redirect URI are required.' });
-  try { await saveEnvironmentValues(values); return response.json({ success: true, message: 'Google Drive configuration saved securely on the backend.' }); }
-  catch (error) { return response.status(500).json({ success: false, error: 'The server could not save the configuration.' }); }
-});
+async function saveEnvironmentValues(values) { let contents = ''; try { contents = await fs.readFile(envPath, 'utf8'); } catch (error) { if (error.code !== 'ENOENT') throw error; } const lines = contents.split(/\r?\n/).filter((line) => line.length > 0); for (const [key, value] of Object.entries(values)) { const escapedValue = value.replace(/\\/g, '\\\\').replace(/\n/g, ''); const index = lines.findIndex((line) => line.startsWith(`${key}=`)); if (index >= 0) lines[index] = `${key}=${escapedValue}`; else lines.push(`${key}=${escapedValue}`); process.env[key] = value; } await fs.writeFile(envPath, `${lines.join('\n')}\n`, { mode: 0o600 }); }
+app.post('/api/save-drive-config', async (request, response) => { const values = { GOOGLE_CLIENT_ID: cleanConfigValue(request.body.clientId) || DEFAULT_GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET: cleanConfigValue(request.body.clientSecret), GOOGLE_REDIRECT_URI: cleanConfigValue(request.body.redirectUri) || DEFAULT_GOOGLE_REDIRECT_URI }; if (!values.GOOGLE_CLIENT_SECRET || !/^https?:\/\//i.test(values.GOOGLE_REDIRECT_URI)) return response.status(400).json({ success: false, error: 'Client secret and a valid redirect URI are required.' }); try { await saveEnvironmentValues(values); return response.json({ success: true, message: 'Google Drive configuration saved securely on the backend.' }); } catch (error) { return response.status(500).json({ success: false, error: 'The server could not save the configuration.' }); } });
 function getConfiguredRedirectUri() { return cleanConfigValue(process.env.GOOGLE_REDIRECT_URI) || DEFAULT_GOOGLE_REDIRECT_URI; }
 function beginGoogleAuthorization(request, response) { try { return response.redirect(getAuthorizationUrl(getConfiguredRedirectUri())); } catch (error) { return response.status(503).json({ success: false, error: error.message }); } }
-async function completeGoogleAuthorization(request, response) {
-  try {
-    if (request.query.error) return response.status(400).send(`Google authorization was cancelled or denied: ${request.query.error_description || request.query.error}`);
-    if (!request.query.code) return response.status(400).json({ success: false, error: 'Authorization code is missing.' });
-    const tokens = await exchangeAuthorizationCode(request.query.code, getConfiguredRedirectUri());
-    const tokenValues = {};
-    if (tokens.access_token) tokenValues.GOOGLE_ACCESS_TOKEN = tokens.access_token;
-    if (tokens.refresh_token) tokenValues.GOOGLE_REFRESH_TOKEN = tokens.refresh_token;
-    if (tokens.expiry_date) tokenValues.GOOGLE_TOKEN_EXPIRY = String(tokens.expiry_date);
-    await saveEnvironmentValues(tokenValues);
-    return response.redirect('/#settings?connected=true');
-  } catch (error) { return response.status(502).json({ success: false, error: `Google authorization failed: ${error.message}` }); }
-}
-app.get('/auth/google', beginGoogleAuthorization);
-app.get('/auth/google/callback', completeGoogleAuthorization);
-app.get('/api/drive/auth-url', beginGoogleAuthorization);
-app.get('/api/drive/callback', completeGoogleAuthorization);
+async function completeGoogleAuthorization(request, response) { try { if (request.query.error) return response.status(400).send(`Google authorization was cancelled or denied: ${request.query.error_description || request.query.error}`); if (!request.query.code) return response.status(400).json({ success: false, error: 'Authorization code is missing.' }); const tokens = await exchangeAuthorizationCode(request.query.code, getConfiguredRedirectUri()); const tokenValues = {}; if (tokens.access_token) tokenValues.GOOGLE_ACCESS_TOKEN = tokens.access_token; if (tokens.refresh_token) tokenValues.GOOGLE_REFRESH_TOKEN = tokens.refresh_token; if (tokens.expiry_date) tokenValues.GOOGLE_TOKEN_EXPIRY = String(tokens.expiry_date); await saveEnvironmentValues(tokenValues); return response.redirect('/#settings?connected=true'); } catch (error) { return response.status(502).json({ success: false, error: `Google authorization failed: ${error.message}` }); } }
+app.get('/auth/google', beginGoogleAuthorization); app.get('/auth/google/callback', completeGoogleAuthorization); app.get('/api/drive/auth-url', beginGoogleAuthorization); app.get('/api/drive/callback', completeGoogleAuthorization);
 app.get('/api/drive/status', async (request, response) => response.json({ success: true, configured: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REDIRECT_URI), authorized: Boolean(process.env.GOOGLE_REFRESH_TOKEN), clientId: process.env.GOOGLE_CLIENT_ID || null, redirectUri: process.env.GOOGLE_REDIRECT_URI || DEFAULT_GOOGLE_REDIRECT_URI }));
 app.get('/api/drive/files', async (request, response) => { try { return response.json({ success: true, files: await listExcelFiles() }); } catch (error) { return response.status(503).json({ success: false, error: error.message }); } });
-app.get('/api/drive/files/:fileId', async (request, response) => { try { response.type('application/octet-stream').send(Buffer.from(await readExcelFile(request.params.fileId))); } catch (error) { response.status(503).json({ success: false, error: error.message }); } });
-
+app.get('/api/drive/files/:fileId', async (request, response) => { try { response.type('application/octet-stream').send(Buffer.from(await readExcelFile(request.params.fileId))); } catch (error) { return response.status(503).json({ success: false, error: error.message }); } });
 async function loadMappings() { return (await readJsonFile('invoice-format-mappings.json', { formats: {} })) || { formats: {} }; }
 async function loadRecords() { return (await readJsonFile('invoice-records.json', { records: {} })) || { records: {} }; }
-function normalizeMapping(body) {
-  const fields = {};
-  for (const field of INVOICE_FIELDS) {
-    const item = body?.fields?.[field.key] || {};
-    fields[field.key] = { label: cleanConfigValue(item.label) || field.label, sourceLabel: cleanConfigValue(item.sourceLabel), page: Number(item.page) || 1 };
-  }
-  return fields;
-}
-function sanitizeValues(values) {
-  const result = {};
-  for (const field of INVOICE_FIELDS) result[field.key] = cleanConfigValue(values?.[field.key]);
-  result.classification = classifyInvoice(result);
-  return result;
-}
-
-app.post('/api/invoice/prepare', (request, response) => {
-  upload.single('invoice')(request, response, async (uploadError) => {
-    if (uploadError) return response.status(400).json({ success: false, error: uploadError.code === 'LIMIT_FILE_SIZE' ? 'Invoice must be 10 MB or smaller.' : uploadError.message });
-    if (!request.file) return response.status(400).json({ success: false, error: 'Select an invoice file to upload.' });
-    try {
-      const mappings = await loadMappings();
-      const probe = processInvoice(request.file, null);
-      const mapping = mappings.formats[probe.signature] || null;
-      const result = mapping ? processInvoice(request.file, mapping) : probe;
-      return response.json({ success: true, mappingFound: Boolean(mapping), signature: probe.signature, fields: INVOICE_FIELDS, pages: result.pages, values: result.values || {}, invoices: result.invoices || [], filename: request.file.originalname, fileBase64: request.file.buffer.toString('base64'), mimeType: request.file.mimetype });
-    } catch (error) { console.error(error); return response.status(503).json({ success: false, error: error.message }); }
-  });
-});
-
-app.post('/api/invoice/save', (request, response) => {
-  upload.single('invoice')(request, response, async (uploadError) => {
-    if (uploadError) return response.status(400).json({ success: false, error: uploadError.message });
-    if (!request.file) return response.status(400).json({ success: false, error: 'Invoice file is required.' });
-    try {
-      const body = JSON.parse(request.body.data || '{}');
-      const signature = cleanConfigValue(body.signature);
-      if (!signature) return response.status(400).json({ success: false, error: 'Invoice format signature is missing.' });
-
-      const mappings = await loadMappings();
-      const mapping = { signature, fields: normalizeMapping(body) };
-      mappings.formats[signature] = mapping;
-      await writeJsonFile('invoice-format-mappings.json', mappings);
-
-      const parsed = processInvoice(request.file, mapping);
-      const suppliedValues = body.values || {};
-      const extractedInvoices = parsed.invoices?.length ? parsed.invoices : [sanitizeValues(suppliedValues)];
-      const records = await loadRecords();
-      let saved = 0;
-      for (const extracted of extractedInvoices) {
-        const manual = extracted.invoiceNumber ? {} : suppliedValues;
-        const values = sanitizeValues({ ...extracted, ...manual });
-        if (suppliedValues.invoiceNumber) Object.assign(values, sanitizeValues(suppliedValues));
-        if (!values.invoiceNumber) continue;
-        values.classification = classifyInvoice(values);
-        values.updatedAt = new Date().toISOString();
-        values.sourceFile = request.file.originalname;
-        values.sourcePages = extracted.sourcePages || [1];
-        const key = normalize(values.invoiceNumber);
-        records.records[key] = values;
-        saved += 1;
-      }
-      const driveFile = await uploadInvoice(request.file);
-      await writeJsonFile('invoice-records.json', records);
-      return response.status(201).json({ success: true, saved, driveFile, mappingsSaved: true, records: Object.values(records.records) });
-    } catch (error) { console.error('Unable to save invoice:', error); return response.status(503).json({ success: false, error: error.message }); }
-  });
-});
-
+function normalizeMapping(body) { const fields = {}; for (const field of INVOICE_FIELDS) { const item = body?.fields?.[field.key] || {}; fields[field.key] = { label: cleanConfigValue(item.label) || field.label, sourceLabel: cleanConfigValue(item.sourceLabel), page: Number(item.page) || 1 }; } return fields; }
+function sanitizeValues(values) { const result = {}; for (const field of INVOICE_FIELDS) result[field.key] = cleanConfigValue(values?.[field.key]); result.classification = classifyInvoice(result); return result; }
+app.post('/api/invoice/prepare', (request, response) => { upload.single('invoice')(request, response, async (uploadError) => { if (uploadError) return response.status(400).json({ success: false, error: uploadError.code === 'LIMIT_FILE_SIZE' ? 'Invoice must be 10 MB or smaller.' : uploadError.message }); if (!request.file) return response.status(400).json({ success: false, error: 'Select an invoice file to upload.' }); try { const mappings = await loadMappings(); const probe = processInvoice(request.file, null); const mapping = mappings.formats[probe.signature] || null; const result = mapping ? processInvoice(request.file, mapping) : probe; return response.json({ success: true, mappingFound: Boolean(mapping), signature: probe.signature, mapping: mapping || null, fields: INVOICE_FIELDS, pages: result.pages, values: result.values || {}, invoices: result.invoices || [], filename: request.file.originalname, mimeType: request.file.mimetype }); } catch (error) { console.error(error); return response.status(503).json({ success: false, error: error.message }); } }); });
+app.post('/api/invoice/save', (request, response) => { upload.single('invoice')(request, response, async (uploadError) => { if (uploadError) return response.status(400).json({ success: false, error: uploadError.message }); if (!request.file) return response.status(400).json({ success: false, error: 'Invoice file is required.' }); try { const body = JSON.parse(request.body.data || '{}'); const signature = cleanConfigValue(body.signature); if (!signature) return response.status(400).json({ success: false, error: 'Invoice format signature is missing.' }); const mappings = await loadMappings(); const mapping = { signature, fields: normalizeMapping(body) }; mappings.formats[signature] = mapping; await writeJsonFile('invoice-format-mappings.json', mappings); const parsed = processInvoice(request.file, mapping); const suppliedValues = body.values || {}; const extractedInvoices = parsed.invoices?.length ? parsed.invoices : [sanitizeValues(suppliedValues)]; const records = await loadRecords(); let saved = 0; for (const extracted of extractedInvoices) { const values = sanitizeValues({ ...extracted, ...suppliedValues }); if (!values.invoiceNumber) continue; values.classification = classifyInvoice(values); values.updatedAt = new Date().toISOString(); values.sourceFile = request.file.originalname; values.sourcePages = extracted.sourcePages || [1]; records.records[normalize(values.invoiceNumber)] = values; saved += 1; } const driveFile = await uploadInvoice(request.file); await writeJsonFile('invoice-records.json', records); return response.status(201).json({ success: true, saved, driveFile, mappingsSaved: true, records: Object.values(records.records) }); } catch (error) { console.error('Unable to save invoice:', error); return response.status(503).json({ success: false, error: error.message }); } }); });
 app.get('/api/invoices', async (request, response) => { try { const data = await loadRecords(); return response.json({ success: true, invoices: Object.values(data.records || {}) }); } catch (error) { return response.status(503).json({ success: false, error: error.message }); } });
-
-app.post('/api/upload-invoice', (request, response) => {
-  upload.single('invoice')(request, response, async (uploadError) => {
-    if (uploadError) return response.status(400).json({ success: false, error: uploadError.message });
-    if (!request.file) return response.status(400).json({ success: false, error: 'Select an invoice file to upload.' });
-    try { const file = await uploadInvoice(request.file); return response.status(201).json({ success: true, message: 'Invoice uploaded successfully.', file }); }
-    catch (error) { return response.status(503).json({ success: false, error: error.message }); }
-  });
-});
-
+app.post('/api/upload-invoice', (request, response) => { upload.single('invoice')(request, response, async (uploadError) => { if (uploadError) return response.status(400).json({ success: false, error: uploadError.message }); if (!request.file) return response.status(400).json({ success: false, error: 'Select an invoice file to upload.' }); try { const file = await uploadInvoice(request.file); return response.status(201).json({ success: true, message: 'Invoice uploaded successfully.', file }); } catch (error) { return response.status(503).json({ success: false, error: error.message }); } }); });
 app.use((request, response) => response.status(404).json({ success: false, error: 'Endpoint not found.' }));
 app.use((error, request, response, next) => { if (response.headersSent) return next(error); console.error(error); return response.status(500).json({ success: false, error: 'Unexpected server error.' }); });
 app.listen(port, () => console.log(`GST/Ops server listening on http://localhost:${port}`));
