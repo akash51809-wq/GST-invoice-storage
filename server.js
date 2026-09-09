@@ -39,4 +39,4 @@ app.post('/api/upload-invoice', (request, response) => { upload.single('invoice'
 app.post('/api/admin/reset-invoice-data', async (request, response) => { try { const result = await deleteAllInvoiceData(); await writeJsonFile('invoice-format-mappings.json', { formats: {} }); await writeJsonFile('invoice-records.json', { records: {} }); return response.json({ success: true, message: 'All existing invoice files, invoice records, and saved format mappings have been cleared.', ...result }); } catch (error) { console.error('Invoice reset failed:', error); return response.status(503).json({ success: false, error: error.message }); } });
 app.use((request, response) => response.status(404).json({ success: false, error: 'Endpoint not found.' }));
 app.use((error, request, response, next) => { if (response.headersSent) return next(error); console.error(error); return response.status(500).json({ success: false, error: 'Unexpected server error.' }); });
-app.listen(port, () => console.log(`GST/Ops server listening on http://localhost:${port}`));
+app.listen(port, '0.0.0.0', () => console.log(`GST/Ops server listening on port ${port}`));
