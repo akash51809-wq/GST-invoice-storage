@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0f19" />
+    <title>GST Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .report-page{max-width:1240px}.report-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:10px;padding:14px;margin-bottom:16px}.report-filters label{display:flex;flex-direction:column;gap:6px;color:#9aa9be;font-size:10px}.report-filters select{height:38px;background:#0b121f;border:1px solid #293750;color:var(--text);padding:0 9px;font-size:11px}.outline-button{height:38px;border:1px solid #38506d;background:transparent;color:#a9bad0;padding:0 13px;font-size:10px}.report-filters .outline-button{align-self:end}.report-table-shell{padding:20px}.report-table-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.report-table-head h3{font-family:Syne,sans-serif;font-size:17px}.report-table{width:100%;border-collapse:collapse;min-width:850px;font-size:11px}.report-table th{color:#71809a;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.7px;padding:11px 9px;border-bottom:1px solid #293750}.report-table td{color:#cbd6e7;padding:12px 9px;border-bottom:1px solid #202e43}.report-actions{display:flex;gap:6px;flex-wrap:wrap}.report-action{border:1px solid #30415b;background:#111c2d;color:#a9bad0;padding:6px 8px;font-size:9px;white-space:nowrap}.report-action:hover{border-color:var(--cyan);color:var(--text)}
+      @media(max-width:720px){.report-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.report-table-shell{padding:14px}}
+    </style>
+  </head>
+  <body>
+    <main id="loginView" class="login-view">
+      <div class="login-grid" aria-hidden="true"></div>
+      <div class="login-glow login-glow--one" aria-hidden="true"></div>
+      <div class="login-glow login-glow--two" aria-hidden="true"></div>
+      <section class="login-card tech-frame" aria-labelledby="loginTitle">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <p class="eyebrow">GST / SECURE ACCESS</p>
+        <h1 id="loginTitle">Welcome back<span class="cyan">.</span></h1>
+        <p class="login-intro">Sign in to access your workspace.</p>
+        <form id="loginForm" novalidate>
+          <label class="field-label" for="username">Username</label>
+          <div class="input-wrap"><span class="input-icon">◈</span><input id="username" name="username" autocomplete="username" placeholder="Enter username" required /></div>
+          <label class="field-label" for="password">Password</label>
+          <div class="input-wrap"><span class="input-icon">▣</span><input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter password" required /></div>
+          <p id="loginError" class="login-error" role="alert"></p>
+          <button class="primary-button" type="submit">Enter command center <span>↗</span></button>
+        </form>
+      </section>
+    </main>
+
+    <main id="dashboardView" class="dashboard-view is-hidden">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand"><div class="brand-mark small" aria-hidden="true"><span></span><span></span><span></span></div><span>GST<span class="cyan">/</span>OPS</span></div>
+        <p class="nav-label">Workspace</p>
+        <nav class="main-nav" aria-label="Main navigation">
+          <a class="active" href="#dashboard"><span class="nav-icon">▦</span> My Dashboard <span class="nav-arrow">›</span></a>
+        </nav>
+        <p class="nav-label nav-label--lower">Reports</p>
+        <nav class="main-nav" aria-label="Report navigation">
+          <a id="reportLink" href="#report"><span class="nav-icon">▤</span> Show Invoice <span class="nav-arrow">›</span></a>
+        </nav>
+        <p class="nav-label nav-label--lower">Manage</p>
+        <nav class="main-nav" aria-label="Management navigation">
+          <a id="uploadLink" href="#upload"><span class="nav-icon">↥</span> Upload Invoice <span class="nav-arrow">›</span></a>
+          <a id="settingsLink" href="#settings"><span class="nav-icon">⚙</span> Settings <span class="nav-arrow">›</span></a>
+        </nav>
+      </aside>
+      <section class="dashboard-main">
+        <header class="topbar">
+          <button id="menuButton" class="icon-button menu-button" aria-label="Open navigation">☰</button>
+          <div class="breadcrumb"><span>Workspace</span><b>/</b> My Dashboard</div>
+        </header>
+        <div id="dashboardPage" class="dashboard-content">
+          <div class="welcome-row"><div><p class="eyebrow">WORKSPACE</p><h2>Good morning<span class="cyan">.</span></h2><p class="muted">Your workspace is ready for the next integration.</p></div></div>
+        </div>
+        <div id="reportPage" class="dashboard-content report-page is-hidden">
+          <div class="settings-heading"><div><p class="eyebrow">REPORT / INVOICE REGISTER</p><h2>Show Invoice<span class="cyan">.</span></h2><p class="muted">Fast report from the local invoice index. Files load from Google Drive only when requested.</p></div><span id="reportStatus" class="connection-status"><i></i> INDEX READY</span></div>
+          <form id="reportFilterForm" class="report-filters tech-frame">
+            <label><span>Year</span><select id="reportYear"><option value="">All years</option></select></label>
+            <label><span>Month</span><select id="reportMonth"><option value="">All months</option></select></label>
+            <label><span>Party name</span><select id="reportParty"><option value="">All parties</option></select></label>
+            <label><span>Type</span><select id="reportType"><option value="">Purchase / Sell</option><option value="Purchase">Purchase</option><option value="Sell">Sell</option></select></label>
+            <button class="outline-button" type="button" id="clearReportFilters">Clear</button>
+          </form>
+          <div class="report-table-shell tech-frame"><div class="report-table-head"><h3>Uploaded invoices</h3><span id="reportCount" class="muted">0 records</span></div><div class="table-scroll"><table class="report-table"><thead><tr><th>Invoice no.</th><th>Date</th><th>Party</th><th>Type</th><th>Month</th><th>Amount</th><th>Actions</th></tr></thead><tbody id="reportTableBody"></tbody></table></div><p id="reportEmpty" class="settings-message">No saved invoices found.</p></div>
+        </div>
+        <div id="uploadPage" class="dashboard-content upload-page is-hidden">
+          <div class="settings-heading"><div><p class="eyebrow">GEMINI / GOOGLE DRIVE</p><h2>Upload Invoice<span class="cyan">.</span></h2><p class="muted">Review extracted invoice details, then save the file into the correct Google Drive folder.</p></div><span class="connection-status"><i></i> REVIEW FIRST</span></div>
+          <form id="invoiceTestForm" class="settings-card tech-frame" enctype="multipart/form-data">
+            <label class="field-label" for="invoicePdf">Invoice file</label>
+            <input class="settings-input" id="invoicePdf" name="invoice" type="file" accept="application/pdf,.pdf,image/png,image/jpeg,.png,.jpg,.jpeg" required />
+            <p class="settings-copy">The invoice file is processed in memory. Only extracted metadata is saved locally after Google Drive upload; the original file is not saved locally.</p>
+            <p id="invoiceTestMessage" class="settings-message" role="status"></p>
+            <button id="invoiceTestButton" class="primary-button settings-submit" type="submit">Save invoice to Google Drive <span>↗</span></button>
+          </form>
+          <section id="invoiceResult" class="settings-card tech-frame invoice-result is-hidden" aria-live="polite">
+            <div class="widget-head"><div><p class="eyebrow">EXTRACTION RESULT</p><h3 id="invoiceResultFilename">Invoice details</h3></div><span class="connection-status"><i></i> GEMINI</span></div>
+            <p id="invoiceResultSummary" class="settings-copy"></p>
+            <div id="invoiceResultsList" class="invoice-results-list"></div>
+          </section>
+        </div>
+        <div id="settingsPage" class="dashboard-content settings-page is-hidden">
+          <div class="settings-heading"><div><p class="eyebrow">APPLICATION SETTINGS</p><h2>Configure services<span class="cyan">.</span></h2><p class="muted">Manage the AI and email service settings used by this application.</p></div><span class="connection-status"><i></i> BACKEND READY</span></div>
+          <div class="settings-tabs" role="tablist" aria-label="Settings sections">
+            <button class="settings-tab is-active" type="button" role="tab" aria-selected="true" data-settings-tab="geminiPanel">Gemini</button>
+            <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="emailPanel">Email</button>
+            <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="drivePanel">Google Drive</button>
+          </div>
+          <div class="settings-layout">
+              <form id="geminiForm" class="settings-card tech-frame settings-panel" data-settings-panel="geminiPanel" autocomplete="off">
+              <div class="widget-head"><div><p class="eyebrow">AI CONFIGURATION</p><h3>Gemini settings</h3></div><span class="lock-mark">◇</span></div>
+              <p class="settings-copy">Configure the Gemini model used by the application. Your API key is stored only on the server.</p>
+              <label class="field-label" for="geminiApiKey">Gemini API Key</label><input class="settings-input" id="geminiApiKey" name="geminiApiKey" type="password" autocomplete="new-password" placeholder="Enter API key (leave blank to keep current)" />
+              <label class="field-label" for="geminiModel">Model</label><select class="settings-input" id="geminiModel" name="geminiModel" required><option value="gemini-flash-lite-latest">gemini-flash-lite-latest</option><option value="gemini-3.6-flash">gemini-3.6-flash</option><option value="gemini-2.5-flash">gemini-2.5-flash</option><option value="gemini-2.5-pro">gemini-2.5-pro</option><option value="gemini-2.0-flash">gemini-2.0-flash</option><option value="custom">Set model manually</option></select>
+              <label class="field-label is-hidden" id="customGeminiModelLabel" for="customGeminiModel">Custom model name</label><input class="settings-input is-hidden" id="customGeminiModel" name="customGeminiModel" type="text" placeholder="Example: gemini-2.5-flash-lite" />
+              <p id="geminiMessage" class="settings-message" role="status"></p><button class="primary-button settings-submit" type="submit">Save Gemini settings <span>↗</span></button>
+            </form>
+            <form id="emailForm" class="settings-card tech-frame settings-panel is-hidden" data-settings-panel="emailPanel" autocomplete="off">
+              <div class="widget-head"><div><p class="eyebrow">MAIL DELIVERY</p><h3>Email SMTP settings</h3></div><span class="lock-mark">▣</span></div>
+              <p class="settings-copy">Configure the SMTP connection used for outgoing email. Leave password blank to keep the saved password.</p>
+              <label class="field-label" for="smtpProvider">Email Provider</label><input class="settings-input" id="smtpProvider" name="smtpProvider" type="text" placeholder="Gmail, Outlook, or custom" required />
+              <label class="field-label" for="smtpHost">Host</label><input class="settings-input" id="smtpHost" name="smtpHost" type="text" placeholder="smtp.gmail.com" required />
+              <label class="field-label" for="smtpUsername">Username</label><input class="settings-input" id="smtpUsername" name="smtpUsername" type="text" autocomplete="username" placeholder="billing@example.com" required />
+              <label class="field-label" for="smtpPassword">Password</label><input class="settings-input" id="smtpPassword" name="smtpPassword" type="password" autocomplete="new-password" placeholder="Enter password (leave blank to keep current)" />
+              <label class="field-label" for="smtpEncryption">Encryption</label><select class="settings-input" id="smtpEncryption" name="smtpEncryption" required><option value="tls">TLS</option><option value="ssl">SSL</option></select>
+              <p id="emailMessage" class="settings-message" role="status"></p><button class="primary-button settings-submit" type="submit">Save Email settings <span>↗</span></button>
+            </form>
+            <section id="drivePanel" class="settings-card tech-frame settings-panel is-hidden" data-settings-panel="drivePanel">
+              <div class="widget-head"><div><p class="eyebrow">GOOGLE CLOUD</p><h3>Google Drive configuration</h3></div><span class="lock-mark">▣</span></div>
+              <p class="settings-copy">Save Google OAuth credentials on the server, then authorize this application through Google.</p>
+              <form id="driveConfigForm" autocomplete="off">
+                <label class="field-label" for="googleClientId">Google Client ID</label><input class="settings-input" id="googleClientId" name="clientId" type="text" placeholder="123.apps.googleusercontent.com" required />
+                <label class="field-label" for="googleClientSecret">Google Client Secret</label><input class="settings-input" id="googleClientSecret" name="clientSecret" type="password" autocomplete="new-password" required />
+                <label class="field-label" for="googleRedirectUri">Redirect URI</label><input class="settings-input" id="googleRedirectUri" name="redirectUri" type="url" placeholder="Leave blank to use this host" />
+                <p id="driveMessage" class="settings-message" role="status"></p><button class="primary-button settings-submit" type="submit">Save Drive configuration <span>↗</span></button>
+              </form>
+              <a class="primary-button settings-auth-button" href="/auth/google">Authorize with Google <span>↗</span></a>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
