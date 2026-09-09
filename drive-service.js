@@ -5,59 +5,55 @@ const DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
 function getOAuth2Client(redirectUri = process.env.GOOGLE_REDIRECT_URI) {
   const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI } = process.env;
-  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !(redirectUri || GOOGLE_REDIRECT_URI)) {
-    throw new Error('Google Drive OAuth configuration is incomplete.');
-  }
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !(redirectUri || GOOGLE_REDIRECT_URI)) throw new Error('Google Drive OAuth configuration is incomplete.');
   return new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, redirectUri || GOOGLE_REDIRECT_URI);
 }
-
-function getAuthorizationUrl(redirectUri) {
-  const client = getOAuth2Client(redirectUri);
-  return client.generateAuthUrl({ access_type: 'offline', prompt: 'consent', scope: DRIVE_SCOPES });
-}
-
-async function exchangeAuthorizationCode(code, redirectUri) {
-  const client = getOAuth2Client(redirectUri);
-  const { tokens } = await client.getToken(code);
-  return tokens;
-}
-
+function getAuthorizationUrl(redirectUri) { return getOAuth2Client(redirectUri).generateAuthUrl({ access_type: 'offline', prompt: 'consent', scope: DRIVE_SCOPES }); }
+async function exchangeAuthorizationCode(code, redirectUri) { return (await getOAuth2Client(redirectUri).getToken(code)).tokens; }
 function getDriveClient() {
   const client = getOAuth2Client();
-  if (!process.env.GOOGLE_REFRESH_TOKEN) {
-    throw new Error('Google Drive has not been authorized yet.');
-  }
+  if (!process.env.GOOGLE_REFRESH_TOKEN) throw new Error('Google Drive has not been authorized yet.');
   client.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
   return google.drive({ version: 'v3', auth: client });
 }
 
 async function listExcelFiles() {
   const drive = getDriveClient();
-  const response = await drive.files.list({
-    q: "trashed = false and (mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType = 'application/vnd.ms-excel')",
-    fields: 'files(id,name,mimeType,modifiedTime,size,webViewLink)',
-    orderBy: 'modifiedTime desc',
-  });
+  const response = await drive.files.list({ q: "trashed = false and (mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or mimeType = 'application/vnd.ms-excel')", fields: 'files(id,name,mimeType,modifiedTime,size,webViewLink)', orderBy: 'modifiedTime desc' });
   return response.data.files || [];
 }
-
 async function readExcelFile(fileId) {
   if (!fileId || !/^[a-zA-Z0-9_-]+$/.test(fileId)) throw new Error('A valid Google Drive file ID is required.');
-  const drive = getDriveClient();
-  const response = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'arraybuffer' });
-  return response.data;
+  return (await getDriveClient().files.get({ fileId, alt: 'media' }, { responseType: 'arraybuffer' })).data;
 }
-
 async function uploadInvoice(file) {
   const drive = getDriveClient();
   const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
   if (!folderId) throw new Error('Google Drive invoice folder is not configured.');
-  const response = await drive.files.create({
-    requestBody: { name: file.originalname, mimeType: file.mimetype, parents: [folderId] },
-    media: { mimeType: file.mimetype, body: Readable.from(file.buffer) },
-    fields: 'id,name,mimeType,size,webViewLink',
-  });
-  return response.data;
+  return (await drive.files.create({ requestBody: { name: file.originalname, mimeType: file.mimetype, parents: [folderId] }, media: { mimeType: file.mimetype, body: Readable.from(file.buffer) }, fields: 'id,name,mimeType,size,webViewLink' })).data;
 }
 
-module.exports = { DRIVE_SCOPES, exchangeAuthorizationCode, getAuthorizationUrl, listExcelFiles, readExcelFile, uploadInvoice };
+async function findAppFile(name) {
+  const drive = getDriveClient();
+  const safe = String(name).replace(/'/g, "\\'");
+  const response = await drive.files.list({ q: `trashed = false and name = '${safe}' and mimeType = 'application/json'`, fields: 'files(id,name,modifiedTime,size)', orderBy: 'modifiedTime desc', pageSize: 1 });
+  return response.data.files?.[0] || null;
+}
+async function readJsonFile(name, fallback = null) {
+  const file = await findAppFile(name);
+  if (!file) return fallback;
+  try {
+    const data = await getDriveClient().files.get({ fileId: file.id, alt: 'media' }, { responseType: 'text' });
+    return JSON.parse(data.data);
+  } catch (error) { throw new Error(`Unable to read ${name}: ${error.message}`); }
+}
+async function writeJsonFile(name, value) {
+  const drive = getDriveClient();
+  const existing = await findAppFile(name);
+  const body = JSON.stringify(value, null, 2);
+  const media = { mimeType: 'application/json', body: Readable.from(Buffer.from(body, 'utf8')) };
+  if (existing) return (await drive.files.update({ fileId: existing.id, media, fields: 'id,name,modifiedTime,size,webViewLink' })).data;
+  return (await drive.files.create({ requestBody: { name, mimeType: 'application/json' }, media, fields: 'id,name,modifiedTime,size,webViewLink' })).data;
+}
+
+module.exports = { DRIVE_SCOPES, exchangeAuthorizationCode, getAuthorizationUrl, listExcelFiles, readExcelFile, uploadInvoice, readJsonFile, writeJsonFile };
