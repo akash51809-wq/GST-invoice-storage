@@ -2,6 +2,7 @@ const { google } = require('googleapis');
 const { Readable } = require('node:stream');
 
 const DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive.file'];
+const INVOICE_EXTENSIONS = /\.(xlsx|xls|csv|pdf|png|jpe?g)$/i;
 
 function getOAuth2Client(redirectUri = process.env.GOOGLE_REDIRECT_URI) {
   const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI } = process.env;
@@ -56,4 +57,32 @@ async function writeJsonFile(name, value) {
   return (await drive.files.create({ requestBody: { name, mimeType: 'application/json' }, media, fields: 'id,name,modifiedTime,size,webViewLink' })).data;
 }
 
-module.exports = { DRIVE_SCOPES, exchangeAuthorizationCode, getAuthorizationUrl, listExcelFiles, readExcelFile, uploadInvoice, readJsonFile, writeJsonFile };
+async function deleteAllInvoiceData() {
+  const drive = getDriveClient();
+  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+  if (!folderId) throw new Error('Google Drive invoice folder is not configured.');
+
+  const deleted = [];
+  let pageToken;
+  do {
+    const response = await drive.files.list({
+      q: `'${folderId}' in parents and trashed = false`,
+      fields: 'nextPageToken,files(id,name,mimeType)',
+      pageToken,
+      pageSize: 1000
+    });
+    for (const file of response.data.files || []) {
+      const isInvoice = INVOICE_EXTENSIONS.test(file.name || '');
+      const isAppData = file.name === 'invoice-format-mappings.json' || file.name === 'invoice-records.json';
+      if (isInvoice || isAppData) {
+        await drive.files.delete({ fileId: file.id });
+        deleted.push(file.name);
+      }
+    }
+    pageToken = response.data.nextPageToken;
+  } while (pageToken);
+
+  return { deletedCount: deleted.length, deleted };
+}
+
+module.exports = { DRIVE_SCOPES, exchangeAuthorizationCode, getAuthorizationUrl, listExcelFiles, readExcelFile, uploadInvoice, readJsonFile, writeJsonFile, deleteAllInvoiceData };
